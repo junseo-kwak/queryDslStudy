@@ -15,9 +15,12 @@ import study.querydsl.entity.QTeam;
 import study.querydsl.entity.Team;
 
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.PersistenceUnit;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static study.querydsl.entity.QMember.member;
 import static study.querydsl.entity.QTeam.*;
@@ -182,6 +185,69 @@ public class QueryDslBasicTest {
         assertThat(result).extracting("username").containsExactly("teamA","teamB");
     }
 
+
+    /**
+     * select m, t from Member m join m.team t on t.name = 'teamA'
+     */
+    @Test
+    void on_filtering_join(){
+        List<Tuple> tuple = queryFactory.select(member, team)
+                .from(member)
+                .leftJoin(member.team,team)
+                .on(team.name.eq("teamA"))
+                .fetch();
+
+        for (Tuple tuple1 : tuple) {
+            System.out.println("tuple1 = " + tuple1);
+        }
+    }
+
+    @Test
+    void join_on_no_relation(){
+        em.persist(new Member("teamA"));
+        em.persist(new Member("teamB"));
+        em.persist(new Member("teamC"));
+
+        List<Tuple> tuple = queryFactory.select(member, team)
+                .from(member)
+                .leftJoin(team).on(member.username.eq(team.name))
+                .fetch();
+
+        for (Tuple tuple1 : tuple) {
+            System.out.println("tuple1 = " + tuple1);
+        }
+    }
+
+    @PersistenceUnit
+    EntityManagerFactory emf;
+    @Test
+    void fetchJoinNo(){
+        em.flush();
+        em.clear();
+
+        Member member1 = queryFactory.selectFrom(member)
+                .where(member.username.eq("member1"))
+                .fetchOne();
+
+        boolean loaded = emf.getPersistenceUnitUtil().isLoaded(member1.getTeam());
+
+        assertThat(loaded).isFalse();
+    }
+
+    @Test
+    void fetchJoinUse(){
+        em.flush();
+        em.clear();
+
+        Member member1 = queryFactory.selectFrom(member)
+                .join(member.team,team).fetchJoin()
+                .where(member.username.eq("member1"))
+                .fetchOne();
+
+        boolean loaded = emf.getPersistenceUnitUtil().isLoaded(member1.getTeam());
+
+        assertThat(loaded).isTrue();
+    }
 
 
 }
